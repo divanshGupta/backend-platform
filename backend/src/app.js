@@ -1,7 +1,9 @@
 import express from "express";
 import cors from "cors";
-import authRoutes from "./modules/auth/auth.routes.js";
 import { protect, authorize } from "./middlewares/auth.middleware.js";
+import authRoutes from "./modules/auth/auth.routes.js";
+import userRoutes from "./modules/users/user.routes.js";
+import attendanceRoutes from "./modules/attendance/attendance.routes.js";
 
 const app = express();
 
@@ -25,6 +27,10 @@ app.get(
     res.json({ message: "Welcome Admin" });
   }
 );
+
+app.use("/api/users", userRoutes);
+
+app.use("/api/attendance", attendanceRoutes)
 
 
 export default app;
