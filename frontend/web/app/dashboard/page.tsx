@@ -1,33 +1,30 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
-import { User } from '@supabase/supabase-js'
+import { useEffect } from 'react'
+import { logout } from '@/lib/auth'
 
 export default function DashboardPage() {
+  const { user, profile, role, loading } = useAuth()
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (!data.user) {
-        router.push('/login')
-      } else {
-        setUser(data.user)
-      }
+    if (!loading && !user) {
+      router.push('/login')
     }
+  }, [loading, user, router])
 
-    fetchUser()
-  }, [router])
-
-  if (!user) return <p>Loading...</p>
+  if (loading) return <p>Loading...</p>
+  if (!user) return  <p>Not logged in</p>
 
   return (
     <main>
       <h1>Dashboard</h1>
       <p>Email: {user.email}</p>
+      <p>FullName: {profile?.full_name}</p>
+      <p>Role: {role}</p>
+      <button onClick={logout}>Logout</button>
     </main>
   )
 }

@@ -1,9 +1,10 @@
+import Button from "@/components/Button";
+
 export default function Home() {
   return (
-    <main className="h-screen flex items-center justify-center bg-black">
-      <h1 className="text-6xl font-bold text-pink-500">
-        TAILWIND TEST
-      </h1>
-    </main>
+    <div className="min-h-screen flex items-center justify-center gap-4">
+      <Button>Start Workout</Button>
+      <Button variant="secondary">Skip</Button>
+    </div>
   );
 }

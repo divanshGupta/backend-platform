@@ -40,9 +40,9 @@ export default function SignupPage() {
       <h1>Create Account</h1>
 
       <form onSubmit={handleSubmit}>
-        <input name="fullName" placeholder="Full Name" onChange={handleChange} />
-        <input name="email" type="email" placeholder="Email" onChange={handleChange} />
-        <input name="password" type="password" placeholder="Password" onChange={handleChange} />
+        <input className="text-black" name="fullName" placeholder="Full Name" onChange={handleChange} />
+        <input className="text-black" name="email" type="email" placeholder="Email" onChange={handleChange} />
+        <input className="text-black" name="password" type="password" placeholder="Password" onChange={handleChange} />
 
         <button disabled={loading} className='hover:bg-red-300'>
           {loading ? 'Creating...' : 'Sign Up'}
