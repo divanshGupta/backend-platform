@@ -9,6 +9,8 @@ from src.core.config.settings import get_settings
 from src.core.database.base import Base
 
 # Import all models here so Base.metadata is fully populated
+# Import all models here so Base.metadata is fully populated
+from src.modules.user.model import User  # noqa: F401
 # before Alembic compares it against the database.
 # (empty for now — we'll add imports as modules gain models,
 # e.g. `from src.modules.user.model import User`)
@@ -22,6 +24,18 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    Explicitly exclude Alembic's own bookkeeping table from
+    autogenerate comparison. Without this, enabling include_schemas
+    (needed for our multi-schema setup) can cause autogenerate to
+    treat alembic_version as an untracked table and propose dropping it —
+    which would destroy migration history if ever applied.
+    """
+    if type_ == "table" and name == "alembic_version":
+        return False
+    return True
+
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -31,6 +45,8 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
+        version_table_schema="public",
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -41,6 +57,8 @@ def do_run_migrations(connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,  # required: our tables span multiple Postgres schemas (public, hospital, ...)
+        version_table_schema="public",
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

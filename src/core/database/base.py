@@ -18,5 +18,11 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 class PlatformBase(Base):
+    """
+    Base for all models in the `platform` schema — identity and
+    access-control data (users, roles, permissions, refresh tokens,
+    audit logs) shared across whichever business app this deployment
+    is currently running.
+    """
     __abstract__ = True
     __table_args__ = {"schema": "platform"}
