@@ -1,8 +1,10 @@
-# Node.js dependencies
-node_modules/
-
-# Environment variables
+cat > .gitignore << 'EOF'
+.venv/
+__pycache__/
+*.pyc
 .env
-
-# Notes
-
+.env.local
+*.db
+.pytest_cache/
+.ruff_cache/
+EOF
