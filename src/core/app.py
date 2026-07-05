@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 
 from src.core.config.settings import get_settings
-
+from src.modules.user.controller import router as user_router
+from src.core.database import model_registry  # noqa: F401
 
 def create_app() -> FastAPI:
     """
@@ -21,6 +22,8 @@ def create_app() -> FastAPI:
         debug=not settings.is_production,
     )
 
+    app.include_router(user_router)
+    
     @app.get("/health", tags=["system"])
     def health_check() -> dict:
         return {"status": "ok", "environment": settings.environment}

@@ -8,9 +8,8 @@ from sqlalchemy import pool
 from src.core.config.settings import get_settings
 from src.core.database.base import Base
 
-# Import all models here so Base.metadata is fully populated
-# Import all models here so Base.metadata is fully populated
-from src.modules.user.model import User  # noqa: F401
+# Importing all models here so Base.metadata is fully populated
+from src.core.database import model_registry  # noqa: F401
 # before Alembic compares it against the database.
 # (empty for now — we'll add imports as modules gain models,
 # e.g. `from src.modules.user.model import User`)
