@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from src.core.config.settings import get_settings
 from src.modules.user.controller import router as user_router
+from src.modules.user.controller import auth_router as auth_router
 from src.core.database import model_registry  # noqa: F401
 
 def create_app() -> FastAPI:
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(user_router)
+    app.include_router(auth_router)
     
     @app.get("/health", tags=["system"])
     def health_check() -> dict:

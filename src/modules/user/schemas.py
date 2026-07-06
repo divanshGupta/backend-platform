@@ -22,3 +22,12 @@ class UserRead(BaseModel):
     updated_at: datetime
 
 # i am not using regex based "must contain symbols etc" rules here, because of fast pace develope, it is necessary though and will implement later in v2
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"

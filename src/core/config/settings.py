@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment == "production"
 
+    jwt_secret_key: str  # load from .env — NEVER hardcode, NEVER commit
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 15
+    jwt_refresh_token_expire_days: int = 7
+
 
 @lru_cache
 def get_settings() -> Settings:

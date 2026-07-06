@@ -15,3 +15,4 @@ usually with a large, confusing traceback pointing at the wrong file.
 from src.modules.user.model import User  # noqa: F401
 from src.modules.role.model import Role  # noqa: F401
 from src.modules.permission.model import Permission  # noqa: F401
+from src.modules.user.token_model import RefreshToken  # noqa: F401

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.modules.user.model import User
 from src.modules.user.repository import UserRepository
 from src.modules.role.repository import RoleRepository
-from src.packages.auth.hashing import hash_password
+from src.packages.auth.hashing import hash_password, verify_password
 
 class RoleNotFoundError(Exception):
     pass
@@ -19,6 +19,19 @@ class DuplicateEmailError(Exception):
 
 class DuplicateUsernameError(Exception):
     pass
+
+
+class InvalidCredentialsError(Exception):
+    """Raised for any authentication failure. Deliberately generic —
+    never distinguish 'no such user' from 'wrong password' to the caller."""
+    pass
+
+
+# A pre-computed dummy hash, used only to burn equivalent CPU time when
+# the user doesn't exist — so response timing doesn't leak whether the
+# email is registered. Generate once with hash_password("dummy") and paste
+# the result here as a constant; don't recompute it per request.
+_DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$43b6e5FcVPGIjMyhRSvsRg$6ZgAKayGkYAdTi8jcQTdqLgUFXypTwB1xB9aAwxccVA"
 
 
 class UserService:
@@ -56,5 +69,20 @@ class UserService:
 
         if role not in user.roles:
             user.roles.append(role)
+
+        return user
+    
+    async def authenticate_user(self, email: str, plain_password: str) -> User:
+        user = await self.repository.get_by_email(email)
+
+        if user is None:
+            verify_password(plain_password, _DUMMY_HASH)  # burn equivalent time
+            raise InvalidCredentialsError("Invalid email or password")
+
+        if not verify_password(plain_password, user.hashed_password):
+            raise InvalidCredentialsError("Invalid email or password")
+
+        if not user.is_active:
+            raise InvalidCredentialsError("Invalid email or password")
 
         return user
