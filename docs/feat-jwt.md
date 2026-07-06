@@ -85,3 +85,22 @@ All the "verify password → create refresh token row → return token pair" orc
 
 authservice dosnt reimplement credential checking - it depends on userservice and calls the authenticate_user() we already wrote.
 this id dependency injection trade-off workth naming explicitly: injecting userservice into authservice (rather than authservice reaching into userrepository directly) means credentails checking remains at one place. if we ever need to add accunt lockout after N failed attempts, we add it once, in authenticate_user() and every caller benefits.
+
+
+## Login is fully working, Two more pieces remain before JWt auth is done.
+
+1. get_current_user() dependency - decodes the access token, loads theuser, and protects routes. without this, having tokens doesnt actually secure anything yet.
+
+2. refresh + logout endpoints - using the get_by_hash() / revoke() methods already sitting in RefreshTokenRepository, unused until now.
+
+### get_current_user() - it's self-contained, testable in one endpoint and its the piece that turn "we can issue tokens" into "tokens actually protect something".
+
+- this is a fastapi dependency, not a service method - it doenst belong in AuthService because it's not business logic, it's request plumbing: extract the token from the Authorization header, verify it, load the user, hand it to whichever routes asked for it. Every protected route will just declare currect_user: Annotated[User, Depends(get_current_user)] and get this for free.
+
+- Design choice: use Fastapi's HTTPBearer security scheme (not OAuth2PasswordBearer) - OAuth2PasswordBearer assumes a /token form-based flow (OAuth2 spec baggage  you dont need), while HTTPBearer just means "expect Authoriztino: Bearer <token>," which is exactly your actual contract.
+
+### Two things worth noting, briefly:
+
+1. Same generic error message for "bad signature," "expired," "user deleted since token was issued," and "deactivated" — same enumeration principle from authenticate_user(). Don't tell an attacker which of these is true.
+
+2. expected_type=TokenType.ACCESS is doing real work here — this is exactly what stops someone from using a stolen refresh token as an access token.

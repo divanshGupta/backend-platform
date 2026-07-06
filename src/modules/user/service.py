@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.modules.user.model import User
@@ -86,3 +88,10 @@ class UserService:
             raise InvalidCredentialsError("Invalid email or password")
 
         return user
+    
+    async def get_by_id(self, user_id: uuid.UUID) -> User | None:
+        return await self.repository.get_by_id(user_id)
+    
+
+# What the leading underscore means
+# self._repository (with the underscore) is Python's convention for "internal, not part of the public API of this class." It's not a typo, and it's not enforced by the language — Python has no true private keyword like Java or C#. It's a signal to other developers (including future-you): "don't reach into this from outside the class — it's an implementation detail."

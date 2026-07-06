@@ -9,9 +9,10 @@ from src.modules.user.service import (
     DuplicateUsernameError,
     UserService,
 )
+from src.modules.user.model import User
 
 from src.modules.user.auth_service import AuthService
-from src.modules.user.dependencies import get_auth_service
+from src.modules.user.dependencies import get_auth_service, get_current_user
 from src.modules.user.schemas import LoginRequest, TokenResponse
 from src.modules.user.service import InvalidCredentialsError
 
@@ -53,3 +54,7 @@ async def login(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
     )
+
+@router.get("/me", response_model=UserRead)
+async def get_me(current_user: Annotated[User, Depends(get_current_user)]) -> UserRead:
+    return UserRead.model_validate(current_user)
