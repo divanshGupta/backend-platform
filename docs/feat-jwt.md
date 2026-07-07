@@ -104,3 +104,40 @@ this id dependency injection trade-off workth naming explicitly: injecting users
 1. Same generic error message for "bad signature," "expired," "user deleted since token was issued," and "deactivated" — same enumeration principle from authenticate_user(). Don't tell an attacker which of these is true.
 
 2. expected_type=TokenType.ACCESS is doing real work here — this is exactly what stops someone from using a stolen refresh token as an access token.
+
+## refresh token rotation and logout.
+- both use the get_by_hash() and revoke() methods already sitting in RefreshTokenRepository, unused until now.
+
+- <CONCEPT> why rotation, why not just reuse?
+- everytime a refres token is used, the server issues a new refresh token, and immediately revoke the last one, in this way if a attacker get the old refresh token and he tries to login with that old refresh token, then server will know that someone is using older refresh token, in response server will revoke all the refresh token for that user, forcing a fresh login everywhere, treating it as a likely compromise.
+
+- WHAT WE GONNA DO?
+
+1. AuthService.refresh() - verify refresh token (signature + db lookup + not revoked + not expired), revoke it, issue new access+refresh pair.
+2. Reuse detection - if the presented token's hash isn't found, or is found but already revoked, treat as suspicious.
+3. AuthService.logout() - rvoke a specific refresh token (or all of a user's tokens, if you want a "logout everywhere" option)
+4. Two new routes: POST /auth/refresh, POST  /auth/logout
+5. Schemas: RefreshRequest, maybe reuse TokenResponse
+
+### Repository addition - one more method needed - for reuse detection, we need to revoke every token for a user at once, not just one
+
+### src/modules/user/token_repository.py  (add to existing class)
+async def revoke_all_for_user(self, user_id: uuid.UUID) -> None:
+    await self.session.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.revoked == False)
+        .values(revoked=True)
+    )
+
+#### AuthService.refresh() — the core logic
+
+<Concept>: what makes this different from just "check the token and issue a new one"?
+
+- The refresh token's JWT sign only proves it was legitimately used by user at some point - it says nothing about whether its still supposed to be vaild. Only the db row knows that.
+- so refresh() has to check three things, adn each catched a diff failure mode:
+
+1. JWT sign + type valid - forged tokens, access tokens submitted as refresh tokens
+2. DB row exists for this hash - tokens that were never issued by users
+3. DB row not already revoked - resuse - this exact token was already used once before
+
+- One deliberate choice worth flagging: logout() doesn't raise on a missing/already-revoked token. Calling logout twice, or logging out with a token that already expired, just quietly succeeds both times. This is standard REST practice for destructive/idempotent operations — a client retrying a logout call (e.g. after a flaky network response) shouldn't get an error for something that's already in the state they wanted.

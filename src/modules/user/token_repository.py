@@ -33,3 +33,21 @@ class RefreshTokenRepository:
             .where(RefreshToken.id == token_id)
             .values(revoked=True)
         )
+
+    async def revoke_all_for_user(self, user_id: uuid.UUID) -> None:
+        await self.session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == user_id, RefreshToken.revoked == False)
+            .values(revoked=True)
+        )
+
+    async def commit(self) -> None:
+        """Force this repository's pending writes to persist immediately,
+        independent of the request's overall commit/rollback outcome.
+
+        Used only for security-critical writes (like mass token revocation)
+        that must survive even when the request itself is about to fail —
+        the normal per-request commit-on-success pattern would otherwise
+        silently discard them on rollback.
+        """
+        await self.session.commit()
