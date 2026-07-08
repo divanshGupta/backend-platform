@@ -141,3 +141,16 @@ async def revoke_all_for_user(self, user_id: uuid.UUID) -> None:
 3. DB row not already revoked - resuse - this exact token was already used once before
 
 - One deliberate choice worth flagging: logout() doesn't raise on a missing/already-revoked token. Calling logout twice, or logging out with a token that already expired, just quietly succeeds both times. This is standard REST practice for destructive/idempotent operations — a client retrying a logout call (e.g. after a flaky network response) shouldn't get an error for something that's already in the state they wanted.
+
+
+## So the full picture confirms both properties simultaneously:
+
+- Logout is scoped correctly (step 2 → only A revoked, B still worked normally in step 2's refresh)
+- Reuse detection is appropriately aggressive (step 3 → touching a dead token nukes the whole account's sessions, even ones created after the logout)
+
+## Where this leaves you
+JWT authentication is now fully built and verified end-to-end:
+
+- Register → login → access token → protected route ✅
+- Refresh token rotation with reuse detection ✅ (including the tricky commit/rollback bug you actually hit and fixed)
+- Logout (single-device scope) ✅, correctly composing with reuse detection when a dead token resurfaces ✅
