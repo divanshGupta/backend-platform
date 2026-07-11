@@ -136,4 +136,4 @@ Per the project's own milestone plan (`moducore.md`):
 - Build out `packages/audit` properly — several places in the Hospital app
   (notably Stock adjustments) currently only log changes via Python's standard
   logging as an interim measure, deliberately deferring full audit-trail
-  persistence until this package exists (for now). Will do it later.
+  persistence until this package exists.

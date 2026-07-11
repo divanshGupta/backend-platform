@@ -22,7 +22,7 @@ from src.apps.hospital.medicine.category_model import Category  # noqa: F401
 from src.apps.hospital.supplier.supplier_model import Supplier  # noqa: F401
 from src.apps.hospital.medicine.medicine_model import Medicine  # noqa: F401
 from src.apps.hospital.medicine.stock_model import Stock  # noqa: F401
-
+from src.apps.hospital.purchase.purchase_model import Purchase  # noqa: F401
 
 
 """

@@ -30,6 +30,8 @@ PERMISSIONS = [
     ("stock.adjust", "Adjust stock quantity (dispense, receive, correct)"),
     ("stock.update", "Update batch number or expiry date"),
     ("stock.delete", "Delete stock records"),
+    ("purchase.read", "View purchase records"),
+    ("purchase.create", "Create new purchase records (also creates stock)"),
 ]
 
 # Roles and which permissions each one grants.
@@ -40,8 +42,9 @@ ROLES = {
         "category.read",
         "supplier.read",
         "stock.read", "stock.create", "stock.adjust",
+        "purchase.read", "purchase.create", 
     ],
-    "Viewer": ["medicine.read", "category.read", "supplier.read", "stock.read"],
+    "Viewer": ["medicine.read", "category.read", "supplier.read", "stock.read", "purchase.read"],
 }
 
 

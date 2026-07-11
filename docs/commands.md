@@ -1,7 +1,7 @@
 # Alembic
 
-1. GENERATING MIGRATION - python -m alembic revision --autogenerate -m "add hospital.stocks table"
-2. python -m alembic upgrade head
+1. python -m alembic revision --autogenerate -m "add hospital.stocks table" - generating alembic migration
+2. python -m alembic upgrade head - applying the migration into db
 
 # Docker exec
 
@@ -14,4 +14,5 @@
 
 # Python
 
-1. uv run python -m scripts/seed_rbac
+1. uv run python -m scripts.seed_rbac - running the scripts
+2. uv run uvicorn src.main:app  --reload - starting the main app (server)

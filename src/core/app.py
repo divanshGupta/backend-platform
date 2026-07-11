@@ -9,6 +9,7 @@ from src.apps.hospital.medicine.category_controller import router as category_ro
 from src.apps.hospital.supplier.supplier_controller import router as supplier_router
 from src.apps.hospital.medicine.medicine_controller import router as medicine_router
 from src.apps.hospital.medicine.stock_controller import router as stock_router
+from src.apps.hospital.purchase.purchase_controller import router as purchase_router
 
 from src.core.database import model_registry  # noqa: F401
 
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(supplier_router)
     app.include_router(medicine_router)
     app.include_router(stock_router)
+    app.include_router(purchase_router)
     
     @app.get("/health", tags=["system"])
     def health_check() -> dict:
