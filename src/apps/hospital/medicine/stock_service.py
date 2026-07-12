@@ -8,6 +8,10 @@ from src.apps.hospital.medicine.stock_model import Stock
 from src.apps.hospital.medicine.stock_repository import StockRepository
 from src.apps.hospital.medicine.medicine_repository import MedicineRepository
 
+from src.packages.audit.service import AuditService
+from src.packages.audit.utils import serialize_model
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,9 +35,10 @@ class StockService:
     before insert. Never writes SQL directly.
     """
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, audit_service: AuditService):
         self.repository = StockRepository(session)
         self.medicine_repository = MedicineRepository(session)
+        self.audit_service = audit_service
 
     async def create_stock(
         self, medicine_id: uuid.UUID, batch_number: str, quantity: int, expiry_date: date
@@ -71,6 +76,8 @@ class StockService:
         stock = await self.repository.get_by_id(stock_id)
         if stock is None:
             raise StockNotFoundError(f"Stock not found: {stock_id}")
+        
+        old_value = serialize_model(stock) # full snapshot, befoer mutatino
 
         new_quantity = stock.quantity + delta
         if new_quantity < 0:
@@ -82,9 +89,20 @@ class StockService:
         stock.quantity = new_quantity
         stock = await self.repository.update(stock)
 
-        logger.info(
-            "Stock adjusted: stock_id=%s delta=%s new_quantity=%s reason=%s",
-            stock_id, delta, new_quantity, reason,
+        new_value = serialize_model(stock)
+        new_value["reason"] = reason # not a stock column - tacked onto new_value as action context
+
+        # logger.info(
+        #     "Stock adjusted: stock_id=%s delta=%s new_quantity=%s reason=%s",
+        #     stock_id, delta, new_quantity, reason,
+        # )
+
+        await self.audit_service.record(
+            action="stock.adjust",
+            entity_type="Stock",
+            entity_id=stock.id,
+            old_value=old_value,
+            new_value=new_value,
         )
         return stock
 

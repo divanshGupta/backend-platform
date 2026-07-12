@@ -14,6 +14,9 @@ from src.apps.hospital.dashboard.dashboard_controller import router as dashboard
 
 from src.core.database import model_registry  # noqa: F401
 
+# middleware
+from src.core.middleware.audit_context import AuditContextMiddleware
+
 def create_app() -> FastAPI:
     """
     Application factory.
@@ -31,6 +34,15 @@ def create_app() -> FastAPI:
         version="0.1.0",
         debug=not settings.is_production,
     )
+
+    app.add_middleware(AuditContextMiddleware)
+    """
+    Order matters here in one subtle way: middleware registered with 
+    add_middleware runs outermost-registered-last, 
+    but since AuditContextMiddleware only sets IP (actor comes later, inside get_current_user) 
+    and doesn't depend on any other middleware, it's safe as the only one right now regardless of position. 
+    Worth revisiting if we have to add CORS or logging middleware later — those don't need to run before or after this one specifically.
+    """
 
     app.include_router(user_router)
     app.include_router(auth_router)

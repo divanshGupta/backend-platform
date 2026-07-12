@@ -1,6 +1,6 @@
 # Backend Platform — project documentation
 
-_Last updated: July 11, 2026_
+_Last updated: July 12, 2026_
 
 ## What this project is
 
@@ -26,11 +26,12 @@ core → packages → modules → apps
 
 - **Core** — infrastructure only (config, DB session management, DI, middleware,
   exception handling). Never contains business logic.
-- **Packages** — reusable forever, business-agnostic (auth, RBAC, logging — these
-  never know what a "hospital" or "medicine" is).
+- **Packages** — reusable forever, business-agnostic (auth, RBAC, audit logging
+  — these never know what a "hospital" or "medicine" is).
 - **Modules** — reusable domain concepts (users, roles, permissions).
 - **Apps** — actual client systems (Hospital, and eventually others), each combining
-  reusable modules into a real product.
+  reusable modules — and, where a feature is genuinely business-specific (like
+  the Hospital Dashboard), business-specific code — into a real product.
 
 Within any single feature, the request/response path always flows:
 
@@ -62,6 +63,17 @@ password hashing · PyJWT (HS256) · HTTPie for manual API testing.
   fully reconciles roles' permissions on every run.
 - **Users**: registration, login, profile retrieval, role assignment.
 
+### Reusable packages (`packages/`)
+
+- **Auth** — see above.
+- **Audit** — a business-agnostic audit trail: records actor, IP, action,
+  entity type/ID, and full before/after JSON snapshots for any mutation.
+  Manual instrumentation (explicit service calls, not ORM event hooks), actor/IP
+  propagated via request-scoped `contextvars`. Mechanism is complete and
+  verified end-to-end; currently piloted on Stock adjustments only. Extending
+  it to Medicine/Purchase/Category/Supplier is documented and deferred — see
+  `audit-logging-feature.md` and `audit-logging-extension-guide.md`.
+
 ### Hospital Inventory MVP (`hospital` schema)
 
 | Module | What it does | Status |
@@ -69,9 +81,9 @@ password hashing · PyJWT (HS256) · HTTPie for manual API testing.
 | **Category** | Medicine categorization (e.g. "Antibiotics"). Full CRUD. | ✅ Complete |
 | **Supplier** | Supplier/vendor records with contact info. Full CRUD. | ✅ Complete |
 | **Medicine** | Core medicine catalog, referencing Category + Supplier. Full CRUD, includes name search. | ✅ Complete |
-| **Stock** | Batch-level inventory: quantity + expiry date per batch, referencing a Medicine. Delta-based quantity adjustments (never direct overwrite) for audit accountability. Zero-quantity batches are preserved, not deleted. | ✅ Complete |
+| **Stock** | Batch-level inventory: quantity + expiry date per batch, referencing a Medicine. Delta-based quantity adjustments (never direct overwrite), preserved for audit accountability. Zero-quantity batches are preserved, not deleted. Adjustments are now audit-logged. | ✅ Complete |
 | **Purchase** | Records a purchase order (Medicine + Supplier + quantity + price), and automatically creates the resulting Stock batch in the same transaction. Append-only — no editing or deleting purchase history. | ✅ Complete |
-| **Dashboard** | Aggregated inventory metrics (total medicines, low stock, expiring soon, out of stock, today's purchases). | 🔲 Not started — next up |
+| **Dashboard** | Aggregated inventory metrics: total medicines, low stock, expiring soon, out of stock, today's purchases. Lives under `apps/hospital/dashboard/` (deliberately, not `modules/dashboard/` — its metrics are Hospital-specific). | ✅ Complete |
 
 Every completed module above has been:
 - Migrated and schema-verified directly against the live PostgreSQL database (not
@@ -114,17 +126,34 @@ order they were encountered:
    constraints without an explicit schema dict as the final element drops the
    inherited schema from the base class entirely, caught by reviewing the
    generated Alembic migration before applying it, not after.
+6. **A brand-new controller's router never registered** — the Dashboard router
+   was fully written but never added via `app.include_router(...)`, producing a
+   plain 404 (not a 403) that was easy to mistake for an auth/permission issue
+   at first glance. Same root cause as forgetting to re-run `seed_rbac.py`: code
+   that exists on disk but isn't actually wired into the running app.
+7. **Auditing a `None` user before checking for `None`** — `get_current_user`
+   called `set_actor(user.id)` before its own null-check, crashing with
+   `AttributeError` instead of cleanly returning 401 for a deleted user's
+   still-valid-looking token.
+8. **JSONB serialization doesn't know what a `UUID` is** — Postgres's JSONB
+   parameter binding uses the stdlib `json` encoder, which has no built-in
+   support for `uuid.UUID` objects (same category of gap as `Decimal`, already
+   handled). Generalized lesson: any SQLAlchemy column type that isn't a
+   JSON-native primitive needs an explicit conversion branch wherever full-row
+   snapshots are serialized.
 
 ## What's next
 
-Per the project's own milestone plan (`moducore.md`):
+Per the project's own milestone plan (`moducore.md`), Week 3 is now fully
+complete (Medicine, Categories, Suppliers, Stock, Purchases, Dashboard).
 
-- **Dashboard** (remaining Week 3 item) — aggregated read-only metrics across
-  the modules already built. Architecturally different from everything above:
-  no new table, no new migration, just well-designed aggregation queries.
-- **Week 4 — polish & portfolio**: automated tests (pytest), richer seed data,
-  Swagger/OpenAPI documentation improvements, deployment setup, a demo frontend
-  integration, and portfolio-ready documentation/screenshots.
+**Immediate next step: automated testing (pytest)** — nothing has automated
+coverage yet; everything so far has been verified manually via HTTPie + direct
+`psql` inspection. This is the current priority, ahead of further feature work.
+
+**Week 4 — polish & portfolio** (remaining, after pytest): richer seed data,
+Swagger/OpenAPI documentation improvements, deployment setup, a demo frontend
+integration, and portfolio-ready screenshots.
 
 ## Longer-term roadmap
 
@@ -133,7 +162,13 @@ Per the project's own milestone plan (`moducore.md`):
   as-is, building new `apps/*` for each business domain.
 - Formalize a multi-client deployment/cloning workflow, since this platform is
   designed as one-deployment-per-client rather than multi-tenant.
-- Build out `packages/audit` properly — several places in the Hospital app
-  (notably Stock adjustments) currently only log changes via Python's standard
-  logging as an interim measure, deliberately deferring full audit-trail
-  persistence until this package exists (for now). Will do it later.
+- **Extend audit logging** beyond the Stock pilot to Medicine, Purchase,
+  Category, and Supplier mutations — mechanism is complete, extension is
+  mechanical repetition of an established pattern (see
+  `audit-logging-extension-guide.md`), just not yet done.
+- **Surface audit logs to users** — discussed, not built. Leaning toward a
+  dedicated, paginated `GET /audit-logs` endpoint under `packages/audit`'s own
+  controller with a new `audit.read` permission, rather than folding raw audit
+  data into Dashboard's aggregate `/summary` response. Blocked on
+  `packages/pagination`, which doesn't exist yet and is a separate piece of
+  scope on its own.

@@ -15,6 +15,9 @@ from src.modules.user.service import UserService
 from src.modules.user.token_repository import RefreshTokenRepository
 from src.modules.user.auth_service import AuthService
 
+# audit
+from src.packages.audit.context import set_actor
+
 bearer_scheme = HTTPBearer()
 
 def get_user_service(
@@ -61,6 +64,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    #for auditing
+    set_actor(user.id)
     return user
 
 def require_permission(permission: str):
