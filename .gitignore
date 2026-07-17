@@ -3,6 +3,7 @@ cat > .gitignore << 'EOF'
 __pycache__/
 *.pyc
 .env
+.env.test
 .env.local
 *.db
 .pytest_cache/
