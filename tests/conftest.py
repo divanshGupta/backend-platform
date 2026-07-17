@@ -1,14 +1,20 @@
 from dotenv import load_dotenv
 load_dotenv(".env.test", override=True)
 
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-
-from src.core.config.settings import get_settings
-
 import asyncio
+
+from httpx import AsyncClient, ASGITransport
+
+import pytest_asyncio
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+
+from src.core.config.settings import get_settings
+from src.core.database.session import get_db
+from src.core.app import create_app
+
 
 @pytest_asyncio.fixture(scope="session")
 async def db_engine():
@@ -41,3 +47,18 @@ async def db_session(db_engine):
         
         if tables:
             await conn.execute(text(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE"))
+
+@pytest_asyncio.fixture(scope="function")
+async def client(db_session):
+    test_app = create_app()
+
+    async def override_get_db():
+        yield db_session
+
+    test_app.dependency_overrides[get_db] = override_get_db
+
+    transport = ASGITransport(app=test_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    test_app.dependency_overrides.clear()

@@ -138,6 +138,8 @@ async def db_engine():
     yield engine
     await engine.dispose()
 
+<notice>
+
 - few things worth pointing out here:
 
 1. pytest_asyncio.fixture instead of plain @pytest.fixture — 
@@ -174,19 +176,16 @@ async def db_engine():
     yield engine
     await engine.dispose()
 
-<step-4> db_session, the function-scoped fixture - gives each individual test a clean, ready-to-use session, then truncates the tables afterward.
+<step-4> db_session fixture, the function-scoped fixture - gives each individual test a clean, ready-to-use session, then truncates the tables afterward.
 
 - Here's the shape:
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 @pytest_asyncio.fixture(scope="function")
 async def db_session(db_engine):
     session_factory = async_sessionmaker(bind=db_engine, expire_on_commit=False)
-    
     async with session_factory() as session:
         yield session
-    
     async with db_engine.begin() as conn:
         result = await conn.execute(text("""
             SELECT table_schema, table_name
@@ -198,6 +197,18 @@ async def db_session(db_engine):
         
         if tables:
             await conn.execute(text(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE"))
+
+<notice> 
+
+- here we are instead of hardcoding table names, we are askingd postgres itself what tables currently exist in platform and hospital schemas, 
+right at truncate time, and trucate whatever it finds. This way, the list is never out of date — it's not a list at all, it's a live query.
+
+- information_schema.tables is a special, built-in view every Postgres database has — 
+it's not one of our tables, it's Postgres's own internal catalog of "here's every table that currently exists." 
+We filter it down to our two schemas, and exclude alembic_version on purpose 
+(truncating that would wipe out Alembic's memory of which migrations have already run — that's bookkeeping, not test data)
+
+<questions>
 
 - why does this fixture take db_engine as parameter?
 
@@ -211,6 +222,63 @@ and hands the result in. db_session needs the engine to build sessions from.
 
 - Why RESTART IDENTITY CASCADE specifically?
 
-1. RESTART IDENTITY resets auto-incrementing ID counters back to 1 (matters for audit_logs, since that's your one BigInteger auto-increment table)
-2. CASCADE — this is important. Since your tables have foreign keys pointing at each other (Stock → Medicine → Category, for example), Postgres would normally refuse to truncate a table that something else still references. CASCADE tells it to truncate all the dependent tables together, safely, in one shot — instead of us having to figure out the exact right order by hand
+1. RESTART IDENTITY resets auto-incrementing ID counters back to 1 (matters for audit_logs, since that's our one BigInteger auto-increment table)
+2. CASCADE — this is important. Since our tables have foreign keys pointing at each other (Stock → Medicine → Category, for example), Postgres would normally refuse to truncate a table that something else still references. CASCADE tells it to truncate all the dependent tables together, safely, in one shot — instead of us having to figure out the exact right order by hand
+
+<step-4> client fixture - the httpx.AsyncClient that actually sends fake requests into FastAPI app
+
+- Here's the key problem this fixture has to solve: our FastAPI app, right now, 
+gets its database session from get_db() — which builds a session from the real async_session_factory in session.py, 
+pointing at our real dev database. If we don't do anything about it, even with .env.test loaded, 
+our app itself would still reach for the real database when handling a request — 
+because session.py's objects were already built before we ever loaded .env.test.
+
+- we don't want to build a brand new session inside the override. 
+We want to hand the app the exact same session that db_session already created for this test.
+
+<notice>
+
+- Why does that matter?
+- if the test creates one session, and the app (handling the fake request) creates a different session, 
+they're technically two separate database connections. Depending on transaction visibility rules, 
+the test might not even "see" data the app just inserted, or vice versa, until something commits. 
+Sharing the exact same session guarantees test code and app code are looking at the database through the same lens.
+
+- So the override function needs to depend on db_session too, and just yield it straight through:
+
+async def override_get_db(db_session):
+    yield db_session
+
+- Now here's where it gets wired into the actual app. 
+FastAPI has a built-in mechanism exactly for this — 
+app.dependency_overrides, a dictionary where we say "whenever a request asks for this dependency, give it this other one instead."
+
+from httpx import AsyncClient, ASGITransport
+
+from src.core.database.session import get_db
+from main import app  # or wherever the FastAPI() instance actually lives
+
+@pytest_asyncio.fixture(scope="function")
+async def client(db_session):
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+<notice>
+
+1. ASGITransport(app=app) — this is the "transport layer". 
+Normally httpx.AsyncClient sends requests over a real network socket. 
+ASGITransport tells it instead: "don't go over the network at all — 
+call the FastAPI app's code directly, in-process." 
+That's what makes this fast and not require a running server.
+
+2. app.dependency_overrides.clear() at the end — this resets the override after each test, 
+so one test's override never accidentally leaks into a different test that might not even want it.
 
