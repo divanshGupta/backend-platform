@@ -15,6 +15,12 @@ from src.core.config.settings import get_settings
 from src.core.database.session import get_db
 from src.core.app import create_app
 
+from src.modules.user.dependencies import get_current_user
+from tests.fake_auth import FakeUser, ALL_PERMISSION_NAMES
+
+@pytest_asyncio.fixture
+def current_user_permissions():
+    return ALL_PERMISSION_NAMES  # default: acts like Admin
 
 @pytest_asyncio.fixture(scope="session")
 async def db_engine():
@@ -49,13 +55,17 @@ async def db_session(db_engine):
             await conn.execute(text(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE"))
 
 @pytest_asyncio.fixture(scope="function")
-async def client(db_session):
+async def client(db_session, current_user_permissions):
     test_app = create_app()
 
     async def override_get_db():
         yield db_session
 
+    async def override_get_current_user():
+        return FakeUser(current_user_permissions)
+
     test_app.dependency_overrides[get_db] = override_get_db
+    test_app.dependency_overrides[get_current_user] = override_get_current_user
 
     transport = ASGITransport(app=test_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
