@@ -18,6 +18,8 @@ from src.core.app import create_app
 from src.modules.user.dependencies import get_current_user
 from tests.fake_auth import FakeUser, ALL_PERMISSION_NAMES
 
+
+# fixture that returns ALL_PERMISSION_NAMES (Admin)
 @pytest_asyncio.fixture
 def current_user_permissions():
     return ALL_PERMISSION_NAMES  # default: acts like Admin

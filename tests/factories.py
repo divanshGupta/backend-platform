@@ -12,3 +12,6 @@ class CategoryFactory(SQLAlchemyFactory[Category]):
     @classmethod
     def name(cls) -> str:
         return f"Test Category {next(_category_counter)}"
+    
+
+    
