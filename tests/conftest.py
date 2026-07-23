@@ -20,6 +20,8 @@ from tests.fake_auth import FakeUser, ALL_PERMISSION_NAMES
 
 from tests.factories import CategoryFactory, SupplierFactory
 
+from src.apps.hospital.medicine.medicine_model import Medicine
+
 
 # fixture that returns ALL_PERMISSION_NAMES (Admin)
 @pytest_asyncio.fixture
@@ -117,3 +119,18 @@ async def category_and_supplier(db_session):
     await db_session.commit()
 
     return category, supplier
+
+
+@pytest_asyncio.fixture
+async def medicine(db_session, category_and_supplier):
+    category, supplier = category_and_supplier
+
+    medicine = Medicine(
+        name="Paracetamol 500mg",
+        category_id=category.id,
+        supplier_id=supplier.id,
+    )
+    db_session.add(medicine)
+    await db_session.commit()
+
+    return medicine
